@@ -103,7 +103,7 @@ class POVConsole extends PApplet {
 		displayText
 		
 		if (dirty) {
-//			fps = X2Client::sendData(pg.pixels)
+			fps = X2Client::sendData("192.168.0.3", pg.pixels)
 			dirty = false
 		}
 		
