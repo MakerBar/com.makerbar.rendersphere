@@ -322,8 +322,9 @@ class POVConsole extends PApplet {
 			camera = null
 		}
 		
-		globeXOffset = 0
-		globeYOffset = 0
+		imageScaleFactor = 1
+		imageXOffset = 0
+		imageYOffset = 0
 		
 		rotationSpeed = 0
 		rotationDirection = 1
@@ -331,6 +332,9 @@ class POVConsole extends PApplet {
 		
 		brightness = 0
 		contrast = 1
+		
+		globeXOffset = 0
+		globeYOffset = 0
 	}
 	
 	def loadProperties() {
