@@ -61,6 +61,7 @@ class POVConsole extends PApplet {
 	var boolean dirty
 	
 	double rps  // rotations per second
+	int fps  // frames per second
 	
 	override setup() {
 		size(700, 300)
@@ -104,14 +105,20 @@ class POVConsole extends PApplet {
 		
 		displayText
 		
-		if (dirty) {
-			rps = X2Client::sendData(X2_HOST, pg.pixels)
-			dirty = false
-		} else {
-			rps = X2Client::getRotationsPerSecond(X2_HOST)
-		}
+//		val stats =
+//			if (dirty) {
+//				dirty = false
+//				X2Client::sendData(X2_HOST, pg.pixels)
+//			} else {
+//				X2Client::getStats(X2_HOST)
+//			}
+//		rps = stats.get(0) as Double
+//		fps = stats.get(1) as Integer
 		
-		text(String::format("%1.2f RPM", rps * 60), 40, 80 + HEIGHT + 20 + textAscent)
+		translate(40, 80 + HEIGHT + 20)
+		text(String::format("%1.2f RPM", rps * 60), 0, textAscent)
+		translate(0, 20)
+		text('''«fps» FPS''', 0, textAscent)
 	}
 	
 	def drawImage() {
