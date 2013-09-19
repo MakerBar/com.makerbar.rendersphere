@@ -23,6 +23,8 @@ class POVConsole extends PApplet {
 
 	static val WIDTH = 4 * 56
 	static val HEIGHT = 6 * 17
+	
+	static val X2_HOST = "192.168.0.3"
 
 	def static void main(String[] args) {
 		PApplet::main("com.makerbar.x2.POVConsole")
@@ -58,7 +60,7 @@ class POVConsole extends PApplet {
 	
 	var boolean dirty
 	
-	double fps
+	double rps  // rotations per second
 	
 	override setup() {
 		size(700, 300)
@@ -103,11 +105,13 @@ class POVConsole extends PApplet {
 		displayText
 		
 		if (dirty) {
-			fps = X2Client::sendData("192.168.0.3", pg.pixels)
+			rps = X2Client::sendData(X2_HOST, pg.pixels)
 			dirty = false
+		} else {
+			rps = X2Client::getRotationsPerSecond(X2_HOST)
 		}
 		
-		text(String::format("%1.2f FPS", fps), 40, 80 + HEIGHT + 20 + textAscent)
+		text(String::format("%1.2f RPM", rps * 60), 40, 80 + HEIGHT + 20 + textAscent)
 	}
 	
 	def drawImage() {
