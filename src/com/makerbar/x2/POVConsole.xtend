@@ -61,7 +61,7 @@ class POVConsole extends PApplet {
 	var boolean dirty
 	
 	double rps  // rotations per second
-	int fps  // frames per second
+	long fps  // frames per second
 	
 	override setup() {
 		size(700, 300)
@@ -113,7 +113,7 @@ class POVConsole extends PApplet {
 //				X2Client::getStats(X2_HOST)
 //			}
 //		rps = stats.get(0) as Double
-//		fps = stats.get(1) as Integer
+//		fps = stats.get(1) as Long
 		
 		translate(40, 80 + HEIGHT + 20)
 		text(String::format("%1.2f RPM", rps * 60), 0, textAscent)
