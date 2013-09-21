@@ -64,7 +64,7 @@ class POVConsole extends PApplet {
 	long fps  // frames per second
 	
 	override setup() {
-		size(700, 300)
+		size(700, 400)
 		
 		pg = createGraphics(WIDTH, HEIGHT)
 		imgPG = createGraphics(WIDTH, HEIGHT)
@@ -79,16 +79,16 @@ class POVConsole extends PApplet {
 			then = now
 		}
 		
+		if (camera != null && camera.available) {
+			camera.read
+			dirty = true
+		}
+		
 		// Clear
 		background(100)
 		
 		pushMatrix
 		translate(40, 80)
-		
-		if (flipImage) {
-			scale(-1, 1)
-			translate(-(WIDTH - 1), 0)
-		}
 		
 		drawImage
 		
@@ -151,6 +151,11 @@ class POVConsole extends PApplet {
 			xImg.updatePixels
 			
 			// Draw globe
+			if (flipImage) {
+				pg.scale(-1, 1)
+				pg.translate(-(WIDTH - 1), 0)
+			}
+			
 			val minX = if (globeXOffset > 0) globeXOffset - WIDTH else globeXOffset
 			val minY = if (globeYOffset > 0) globeYOffset - HEIGHT else globeYOffset
 			
@@ -158,11 +163,6 @@ class POVConsole extends PApplet {
 			while (x < WIDTH) {
 				var y = minY
 				while (y < HEIGHT) {
-					if (camera != null && camera.available) {
-						camera.read
-						dirty = true
-					}
-					
 					pg.pushMatrix
 					pg.translate(x, y)
 					
