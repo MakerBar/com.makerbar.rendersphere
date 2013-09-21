@@ -207,8 +207,11 @@ class POVConsole extends PApplet {
 			c : capture video
 			
 			«IF image != null»
-				+/- : scale image
-				arrow keys : image offset
+				-/+ : scale image decrease/increase
+				H/K/U/J : image offset left/right/up/down
+				arrow keys : globe offset
+				A/D : contrast decrease/increase
+				S/W : brightness decrease/increase
 				(hold shift for fine scale/offset)
 				0-9 : rotation speed
 				R : change rotation direction
