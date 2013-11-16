@@ -1,5 +1,7 @@
 package com.makerbar.x2
 
+import com.makerbar.x2.client.X2Client
+import gifAnimation.Gif
 import java.awt.event.KeyEvent
 import java.io.File
 import java.io.FileReader
@@ -16,8 +18,9 @@ import processing.video.Movie
 
 import static java.awt.event.KeyEvent.*
 import static javax.swing.JFileChooser.*
-import gifAnimation.Gif
-import com.makerbar.x2.client.X2Client
+import java.util.List
+import processing.serial.Serial
+import java.util.Scanner
 
 class POVConsole extends PApplet {
 
@@ -26,8 +29,31 @@ class POVConsole extends PApplet {
 	
 	static val X2_HOST = "192.168.0.3"
 
+	static String arduinoPortName
+
 	def static void main(String[] args) {
+		// Assign serial ports
+		
+//		val ports = Serial::list
+//		for (i : 0 ..< ports.length) {
+//			println('''Serial «i»: «ports.get(i)»''')
+//		}
+//		
+//		val input = new Scanner(System::in)
+//		println
+//		
+//		print("Port for Arduino: ")
+//		arduinoPortName = ports.getPortName(input.nextInt, "Globe Display")
+		
+		// Run!
+		
 		PApplet::main("com.makerbar.x2.POVConsole")
+	}
+	
+	private static def getPortName(List<String> ports, int portNum, String target) {
+		val portName = ports.get(portNum)
+		println('''Port «portNum» aka «portName» <-> «target»''')
+		portName
 	}
 	
 	//
@@ -50,7 +76,13 @@ class POVConsole extends PApplet {
 	int globeXOffset
 	int globeYOffset
 	
-	long then = System::currentTimeMillis / 33
+	long now = System::currentTimeMillis
+	long then = now
+	long lastImageDirRefresh = now
+	
+	List<File> images = getImages
+	File selectedImage = images.get(0)
+	
 	int rotationSpeed
 	int rotationDirection = 1
 	boolean flipImage = false
@@ -61,20 +93,45 @@ class POVConsole extends PApplet {
 	var boolean dirty
 	
 	double rps  // rotations per second
-	long fps  // frames per second
+	double fps  // frames per second
+	
+	boolean processedControls
+	
+	boolean leftButtonIsPressed
+	boolean leftButtonWasPressed
+	boolean rightButtonIsPressed
+	boolean rightButtonWasPressed
+	boolean bigAssButtonIsPressed
+	boolean bigAssButtonWasPressed
+	boolean triggerIsPulled
+	boolean triggerWasPulled
+	boolean switchIsActivated
+	boolean switchWasActivated
+	int joystickX
+	int joystickY
+	
+	Serial serial
 	
 	override setup() {
-		size(700, 400)
+		size(displayWidth, displayHeight)
 		
 		pg = createGraphics(WIDTH, HEIGHT)
 		imgPG = createGraphics(WIDTH, HEIGHT)
 		
 		loadProperties
+		
+		serial = new Serial(this, arduinoPortName, 115200)
+		if (serial != null)
+			serial.buffer(6)
+	}
+	
+	override sketchFullScreen() {
+		true
 	}
 	
 	override draw() {
-		val now = System::currentTimeMillis / 33
-		if (now > then) {
+		now = System::currentTimeMillis
+		if (now / 33 > then / 33) {
 			setGlobeXOffset(globeXOffset + (rotationSpeed * rotationDirection))
 			then = now
 		}
@@ -89,7 +146,8 @@ class POVConsole extends PApplet {
 		
 		pushMatrix
 		translate(40, 80)
-		
+		 
+		scale(3, 3)
 		drawImage
 		
 		// Draw frame
@@ -103,22 +161,56 @@ class POVConsole extends PApplet {
 
 		text('''Display dimensions: «WIDTH» x «HEIGHT»''', 40, 80 - 20 - textDescent)
 		
-		displayText
+		pushMatrix
+		translate(width - 500, 100)
+		displayImageList
+		popMatrix
+		
+		pushMatrix
+		translate(40, height - 400)
+		displayInstructions
+		popMatrix
 		
 //		val stats =
 //			if (dirty) {
 //				dirty = false
-//				X2Client::sendData(X2_HOST, pg.pixels)
+		try {
+			X2Client::sendData(X2_HOST, pg.pixels)
+		} catch (Exception e) {
+			// oh well
+		}
 //			} else {
 //				X2Client::getStats(X2_HOST)
 //			}
 //		rps = stats.get(0) as Double
-//		fps = stats.get(1) as Long
+//		fps = stats.get(1) as Double
 		
-		translate(40, 80 + HEIGHT + 20)
-		text(String::format("%1.2f RPM", rps * 60), 0, textAscent)
-		translate(0, 20)
-		text('''«fps» FPS''', 0, textAscent)
+//		translate(40, 80 + HEIGHT + 20)
+//		text(String::format("%1.2f RPM", rps * 60), 0, textAscent)
+//		translate(0, 20)
+//		text(String::format("%1.2f FPS", fps), 0, textAscent)
+
+		if (leftButtonIsPressed && !leftButtonWasPressed) {
+			selectNextImage(-1)
+		}
+
+		if (bigAssButtonIsPressed && !bigAssButtonWasPressed) {
+			chooseImage
+		}
+
+		if (rightButtonIsPressed && !rightButtonWasPressed) {
+			selectNextImage(1)
+		}
+
+//		if (triggerIsPulled && !triggerWasPulled) {
+//		} else if (!triggerIsPulled && triggerWasPulled) {
+//		}
+
+//		if (switchIsActivated && !switchWasActivated) {
+//		} else if (!switchIsActivated && switchWasActivated) {
+//		}
+
+		processedControls = true
 	}
 	
 	def drawImage() {
@@ -194,11 +286,61 @@ class POVConsole extends PApplet {
 		dirty = true
 	}
 	
-	def displayText() {
+	def getImages() {
+		if (images == null || now / 5000 > lastImageDirRefresh / 5000)
+			images = new File("images").list.sort.map[ i | new File("images", i)].filter[ file ].toList
+		else
+			images
+	}
+	
+	def selectImage() {
+		if (selectedImage == null)
+			selectedImage = images.get(0)
+		else {
+			var i = images.indexOf(selectedImage)
+			if (i == images.size - 1)
+				selectedImage = images.get(0)
+			selectedImage = images.get(i + 1)
+		}
+	}
+	
+	def selectNextImage(int offset) {
+		var i = images.indexOf(selectedImage) + offset
+		if (i < 0) i = images.size - 1
+		if (i == images.size) i = 0
+		selectedImage = images.get(i)
+	}
+	
+	def chooseImage() {
+		resetSettings
+		selectedImage.canonicalPath.openImage
+	}
+	
+	def displayImageList() {
 		pushMatrix
 		pushStyle
 		
-		translate(400, 20)
+		pushMatrix
+		val img = loadImage(selectedImage.canonicalPath)
+		img.scaleImage(224, 102)
+		image(img, 0, 0)
+		popMatrix
+		
+		translate(0, 110)
+		
+		stroke(255)
+		text('''
+			«FOR f : getImages»
+				«f.name» «IF f == selectedImage»*«ENDIF»
+			«ENDFOR»
+			''', 0, 0)
+		
+		popStyle
+		popMatrix
+	}
+	
+	def displayInstructions() {
+		pushStyle
 		
 		stroke(255)
 		text('''
@@ -230,7 +372,6 @@ class POVConsole extends PApplet {
 			''', 0, 0)
 		
 		popStyle
-		popMatrix
 	}
 	
 	override keyPressed(KeyEvent event) {
@@ -281,6 +422,10 @@ class POVConsole extends PApplet {
 				case VK_D: setContrast(contrast + 1 * factor)
 				
 				case VK_ESCAPE: resetSettings
+				
+				case VK_X: selectNextImage(1)
+				case VK_Z: selectNextImage(-1)
+				case VK_SPACE: chooseImage
 			}
 			
 			dirty = true
@@ -340,7 +485,7 @@ class POVConsole extends PApplet {
 		imageXOffset = 0
 		imageYOffset = 0
 		
-		rotationSpeed = 0
+		rotationSpeed = 2
 		rotationDirection = 1
 		flipImage = false
 		
@@ -483,6 +628,73 @@ class POVConsole extends PApplet {
 			imageScaleFactor = (WIDTH as float) / imageWidth
 			imageYOffset = ((HEIGHT - (imageHeight * imageScaleFactor)) / 2) as int
 		}
+	}
+	
+	def scaleImage(PImage image, int targetWidth, int targetHeight) {
+		if (((image.width as float) / image.height) < ((targetWidth as float) / targetHeight)) {
+			scale((targetHeight as float) / image.height)
+		} else {
+			scale((targetWidth as float) / image.width)
+		}
+	}
+	
+	def void serialEvent(Serial serial) {  
+		var nextByte = 0
+	
+		nextByte = serial.read
+//		print(hex(nextByte) + ' ')
+		if (nextByte == 0xFF) {
+			nextByte = serial.read
+//			print(hex(nextByte) + ' ')
+			if (nextByte == 0xFF) {
+				nextByte = serial.read
+//				print(hex(nextByte) + ' ')
+				if (nextByte == 0xFF) {
+					if (!processedControls) {
+//						print(hex(serial.read))
+//						print(hex(serial.read))
+//						print(hex(serial.read))
+//						println
+						serial.read
+						serial.read
+						serial.read
+						return
+			        }
+					
+					leftButtonWasPressed = leftButtonIsPressed
+					rightButtonWasPressed = rightButtonIsPressed
+					bigAssButtonWasPressed = bigAssButtonIsPressed
+					triggerWasPulled = triggerIsPulled
+					switchWasActivated = switchIsActivated
+					
+					nextByte = serial.read
+//					print(hex(nextByte) + ' ')
+					
+					val buttonStates = nextByte
+					leftButtonIsPressed = buttonStates.bitwiseAnd(0x01) != 0
+					bigAssButtonIsPressed = buttonStates.bitwiseAnd(0x02) != 0
+					rightButtonIsPressed = buttonStates.bitwiseAnd(0x04) != 0
+					triggerIsPulled = buttonStates.bitwiseAnd(0x08) != 0
+					switchIsActivated = buttonStates.bitwiseAnd(0x10) != 0
+					
+			        nextByte = serial.read
+//					print(hex(nextByte) + ' ')
+					
+			        joystickX = nextByte - 128
+					
+			        nextByte = serial.read
+//					print(hex(nextByte) + ' ')
+					
+			        joystickY = nextByte - 128
+					
+			        processedControls = false
+//					serial.write('Z')
+				}
+			}
+		}
+		
+//		serial.clear
+//		println
 	}
 	
 }
